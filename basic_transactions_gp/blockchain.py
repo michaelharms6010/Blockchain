@@ -4,6 +4,19 @@ from time import time
 from uuid import uuid4
 
 from flask import Flask, jsonify, request
+from flask_cors import CORS, cross_origin
+
+import pusher
+
+pusher_client = pusher.Pusher(
+  app_id='962630',
+  key='48b94c735bb4bae49e16',
+  secret='ee376e52e09b1a2f778d',
+  cluster='us2',
+  ssl=True
+)
+
+
 
 
 class Blockchain(object):
@@ -115,11 +128,13 @@ class Blockchain(object):
         guess = f'{block_string}{proof}'.encode()
         guess_hash = hashlib.sha256(guess).hexdigest()
 
-        return guess_hash[:5] == "00000"
+        return guess_hash[:3] == "000"
 
 
 # Instantiate our Node
 app = Flask(__name__)
+cors = CORS(app)
+app.config["CORS_HEADERS"] = 'Content-Type'
 
 # Generate a globally unique address for this node
 node_identifier = str(uuid4()).replace('-', '')
@@ -160,6 +175,7 @@ def receive_transaction():
 
 @app.route('/mine', methods=['POST'])
 def mine():
+    triggered=False
     # TODO: Handle non json request
     values = request.get_json()
     # breakpoint()
@@ -170,25 +186,13 @@ def mine():
 
     submitted_proof = values['proof']
 
-    # * Modify the `mine` endpoint to instead receive and 
-    # validate or reject a new proof sent by a client.
-    # * It should accept a POST
-    # * Use `data = request.get_json()` to pull the 
-    # data out of the POST
-    #     * Note that `request` and `requests` both exist 
-    # in this project
-    # * Check that 'proof', and 'id' are present
-    #     * return a 400 error using `jsonify(response)` 
-    # with a 'message'
-
     block_string = json.dumps(blockchain.last_block, sort_keys=True)
     if blockchain.valid_proof(block_string, submitted_proof):
-
+        
         blockchain.new_transaction('0',
                                    values['id'],
                                    1)
-        # Forge the new Block by adding it to the chain with 
-        # the proof
+
         previous_hash = blockchain.hash(blockchain.last_block)
         block = blockchain.new_block(submitted_proof, previous_hash)
 
@@ -204,7 +208,7 @@ def mine():
             'message': "Proof was invalid or late"
         }
 
-        return jsonify(response), 200
+        return jsonify(response), 400
 
 
 @app.route('/chain', methods=['GET'])
